@@ -5,7 +5,7 @@ services:
     region: oregon
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn ulsavam_backend.wsgi:application --bind 0.0.0.0:10000
+    startCommand: bash start.sh
     envVars:
       - key: DJANGO_DEBUG
         value: "False"

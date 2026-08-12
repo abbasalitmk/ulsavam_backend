@@ -3,21 +3,25 @@ set -e
 
 echo "Starting deployment..."
 
+# Find python
+PYTHON=$(which python3 || which python)
+echo "Using Python: $PYTHON"
+
 # Ensure pip is up to date
-python -m pip install --upgrade pip
+$PYTHON -m pip install --upgrade pip --quiet
 
 # Install dependencies
 echo "Installing Python dependencies..."
-python -m pip install -r requirements.txt
+$PYTHON -m pip install -r requirements.txt --quiet
 
 # Run migrations
 echo "Running database migrations..."
-python manage.py migrate || true
+$PYTHON manage.py migrate || true
 
 # Collect static files
 echo "Collecting static files..."
-python manage.py collectstatic --noinput || true
+$PYTHON manage.py collectstatic --noinput || true
 
 # Start gunicorn
-echo "Starting gunicorn..."
-exec gunicorn ulsavam_backend.wsgi:application --bind 0.0.0.0:${PORT:-8000}
+echo "Starting gunicorn on port ${PORT:-8000}..."
+exec $PYTHON -m gunicorn ulsavam_backend.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 1
