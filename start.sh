@@ -18,6 +18,10 @@ $PYTHON -m pip install -r requirements.txt --quiet
 echo "Running database migrations..."
 $PYTHON manage.py migrate || true
 
+# Seed data (only if first run - won't duplicate if already exists)
+echo "Seeding data..."
+$PYTHON manage.py seed_data || true
+
 # Collect static files
 echo "Collecting static files..."
 $PYTHON manage.py collectstatic --noinput || true
