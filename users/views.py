@@ -8,6 +8,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 
 from core.throttling import OTPRequestThrottle
+from core.email_service import send_otp_email
 from .models import User, OTPRequest
 from .serializers import (
     UserSerializer, OTPRequestSerializer, OTPVerifySerializer, LogoutSerializer
@@ -30,7 +31,7 @@ class OTPRequestView(APIView):
 
         code = OTPRequest.generate_code()
         code_hash = OTPRequest.hash_code(code)
-        expires_at = timezone.now() + timedelta(minutes=5)
+        expires_at = timezone.now() + timedelta(minutes=10)
 
         OTPRequest.objects.create(
             identifier=identifier,
@@ -38,15 +39,25 @@ class OTPRequestView(APIView):
             expires_at=expires_at
         )
 
-        # Console logging / developer delivery mode for OTP
-        print(f"\n==========================================")
-        print(f"[ULSAVAM DEV OTP] {method.upper()}: {identifier} -> CODE: {code}")
-        print(f"==========================================\n")
-        logger.info(f"Generated OTP for {identifier}: {code}")
+        # Send OTP via appropriate method
+        if method == 'email' and '@' in identifier:
+            email_sent = send_otp_email(identifier, code, purpose='login')
+            if not email_sent:
+                return Response(
+                    {'error': 'Failed to send OTP email. Please try again.'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+        else:
+            # For SMS or other methods, log to console for development
+            print(f"\n==========================================")
+            print(f"[ULSAVAM OTP] {method.upper()}: {identifier}")
+            print(f"CODE: {code}")
+            print(f"==========================================\n")
+            logger.info(f"Generated OTP for {identifier}: {code}")
 
         return Response({
             'message': f'OTP sent successfully to {identifier}.',
-            'dev_hint': code  # Included for convenient testing
+            'validity': 'Valid for 10 minutes'
         }, status=status.HTTP_200_OK)
 
 class OTPVerifyView(APIView):
