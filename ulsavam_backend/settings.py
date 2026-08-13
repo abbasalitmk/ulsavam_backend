@@ -141,10 +141,7 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False,
 }
 
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'abbasalitmk@gmail.com')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'ekyg xkml rdtl ddyp')
-DEFAULT_FROM_EMAIL = 'Ulsavam <noreply@ulsavam.com>'
+# Email delivery via Resend HTTPS API (not SMTP - Render blocks outbound
+# SMTP ports 25/587/465, which caused OTP emails to hang and time out).
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
+RESEND_FROM_EMAIL = os.environ.get('RESEND_FROM_EMAIL', 'Ulsavam <onboarding@resend.dev>')
