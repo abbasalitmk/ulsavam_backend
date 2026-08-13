@@ -4,12 +4,17 @@ from django.conf import settings
 CATEGORY_CHOICES = [
     ('temple', 'Temple Festival'),
     ('church', 'Church Feast'),
+    ('mosque', 'Mosque Heritage'),
     ('dj_music', 'DJ & Music Show'),
     ('beach_meetup', 'Beach Meetup'),
     ('arts_culture', 'Arts & Culture'),
     ('food_fest', 'Food Festival'),
     ('sports', 'Sports & Games'),
     ('community', 'Community Gathering'),
+    ('literature', 'Literature & Reading'),
+    ('heritage_walk', 'Heritage Walk'),
+    ('market', 'Local Market'),
+    ('nature_park', 'Nature & Park'),
 ]
 
 STATUS_CHOICES = [
