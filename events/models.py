@@ -85,3 +85,15 @@ class Attendance(models.Model):
 
     def __str__(self):
         return f"{self.user} is going to {self.event.title}"
+
+class EventImage(models.Model):
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='images')
+    image = models.ImageField(upload_to='event_images/')
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order', 'created_at']
+
+    def __str__(self):
+        return f"Image #{self.order} for {self.event.title}"

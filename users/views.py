@@ -4,30 +4,112 @@ from datetime import timedelta
 from rest_framework import status, generics, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 
-from core.throttling import OTPRequestThrottle
+from core.throttling import OTPRequestThrottle, LoginThrottle
 from core.email_service import send_otp_email
 from .models import User, OTPRequest
 from .serializers import (
-    UserSerializer, OTPRequestSerializer, OTPVerifySerializer, LogoutSerializer
+    UserSerializer, RegisterSerializer, LoginSerializer,
+    OTPRequestSerializer, OTPVerifySerializer, LogoutSerializer
 )
 
 logger = logging.getLogger(__name__)
 
+
+def tokens_for_user(user):
+    refresh = RefreshToken.for_user(user)
+    return {
+        'access': str(refresh.access_token),
+        'refresh': str(refresh),
+    }
+
+
+class RegisterView(APIView):
+    """
+    Register a new account with email and/or phone, name, password, dob,
+    gender, district, and an optional profile picture.
+    """
+    permission_classes = [permissions.AllowAny]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def post(self, request):
+        serializer = RegisterSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+
+        tokens = tokens_for_user(user)
+        user_data = UserSerializer(user, context={'request': request}).data
+
+        return Response({
+            'message': 'Registration successful.',
+            **tokens,
+            'user': user_data
+        }, status=status.HTTP_201_CREATED)
+
+
+class LoginView(APIView):
+    """
+    Login with username (email or phone number) + password.
+    """
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [LoginThrottle]
+
+    def post(self, request):
+        serializer = LoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        username = serializer.validated_data['username'].strip()
+        password = serializer.validated_data['password']
+
+        if '@' in username:
+            user = User.objects.filter(email=username.lower()).first()
+        else:
+            user = User.objects.filter(phone_number=username).first()
+
+        if not user:
+            return Response({'error': 'Invalid username or password.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not user.has_usable_password() or not user.check_password(password):
+            return Response({'error': 'Invalid username or password.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        tokens = tokens_for_user(user)
+        user_data = UserSerializer(user, context={'request': request}).data
+
+        return Response({
+            'message': 'Login successful.',
+            **tokens,
+            'user': user_data
+        }, status=status.HTTP_200_OK)
+
+
 class OTPRequestView(APIView):
+    """
+    Request an OTP for login (email delivery). Only works for
+    identifiers that already have a registered account.
+    """
     permission_classes = [permissions.AllowAny]
     throttle_classes = [OTPRequestThrottle]
 
     def post(self, request):
         serializer = OTPRequestSerializer(data=request.data)
-        serializer.is_validate_or_400 = serializer.is_valid()
-        if not serializer.is_validate_or_400:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.is_valid(raise_exception=True)
 
         identifier = serializer.validated_data['identifier'].strip()
         method = serializer.validated_data['method']
+
+        if method == 'email':
+            user_exists = User.objects.filter(email=identifier.lower()).exists()
+        else:
+            user_exists = User.objects.filter(phone_number=identifier).exists()
+
+        if not user_exists:
+            return Response(
+                {'error': 'No account found with this identifier. Please register first.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
         code = OTPRequest.generate_code()
         code_hash = OTPRequest.hash_code(code)
@@ -36,10 +118,10 @@ class OTPRequestView(APIView):
         OTPRequest.objects.create(
             identifier=identifier,
             code_hash=code_hash,
+            purpose='login',
             expires_at=expires_at
         )
 
-        # Send OTP via appropriate method
         if method == 'email' and '@' in identifier:
             email_sent = send_otp_email(identifier, code, purpose='login')
             if not email_sent:
@@ -60,13 +142,17 @@ class OTPRequestView(APIView):
             'validity': 'Valid for 10 minutes'
         }, status=status.HTTP_200_OK)
 
+
 class OTPVerifyView(APIView):
+    """
+    Verify OTP and log in. Requires an existing registered account
+    (does not auto-create users) - use /api/auth/register/ to sign up.
+    """
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
         serializer = OTPVerifySerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.is_valid(raise_exception=True)
 
         identifier = serializer.validated_data['identifier'].strip()
         code = serializer.validated_data['code'].strip()
@@ -82,32 +168,33 @@ class OTPVerifyView(APIView):
         if not otp_obj.is_valid(code):
             return Response({'error': 'Invalid or expired OTP code.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Retrieve or create user
         if '@' in identifier:
-            user, created = User.objects.get_or_create(email=identifier.lower())
+            user = User.objects.filter(email=identifier.lower()).first()
         else:
-            user, created = User.objects.get_or_create(phone_number=identifier)
+            user = User.objects.filter(phone_number=identifier).first()
 
-        if created:
-            user.display_name = f"User_{identifier[-4:]}"
-            user.save()
+        if not user:
+            return Response(
+                {'error': 'No account found with this identifier. Please register first.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
-        refresh = RefreshToken.for_user(user)
-        user_data = UserSerializer(user).data
+        tokens = tokens_for_user(user)
+        user_data = UserSerializer(user, context={'request': request}).data
 
         return Response({
-            'access': str(refresh.access_token),
-            'refresh': str(refresh),
+            'message': 'Login successful.',
+            **tokens,
             'user': user_data
         }, status=status.HTTP_200_OK)
+
 
 class LogoutView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
         serializer = LogoutSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.is_valid(raise_exception=True)
 
         try:
             token = RefreshToken(serializer.validated_data['refresh'])
@@ -116,9 +203,15 @@ class LogoutView(APIView):
         except TokenError:
             return Response({'error': 'Invalid or expired refresh token.'}, status=status.HTTP_400_BAD_REQUEST)
 
+
 class UserMeView(generics.RetrieveUpdateAPIView):
+    """
+    Get or update the authenticated user's profile, including
+    uploading/replacing the profile picture (multipart/form-data).
+    """
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_object(self):
         return self.request.user

@@ -1,7 +1,20 @@
 from rest_framework import serializers
-from .models import Event, EventConfirmation, Attendance
+from .models import Event, EventConfirmation, Attendance, EventImage
 from districts.serializers import DistrictSerializer
 from districts.models import District
+
+
+class EventImageSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EventImage
+        fields = ['id', 'image_url', 'order', 'created_at']
+
+    def get_image_url(self, obj):
+        request = self.context.get('request')
+        url = obj.image.url
+        return request.build_absolute_uri(url) if request else url
 
 class EventListSerializer(serializers.ModelSerializer):
     district_name = serializers.CharField(source='district.name', read_only=True)
@@ -40,13 +53,14 @@ class EventDetailSerializer(serializers.ModelSerializer):
     going_count = serializers.IntegerField(read_only=True)
     is_going = serializers.SerializerMethodField()
     is_confirmed_by_user = serializers.SerializerMethodField()
+    images = EventImageSerializer(many=True, read_only=True)
 
     class Meta:
         model = Event
         fields = [
             'id', 'title', 'description', 'category', 'district', 'district_details',
             'venue_name', 'address', 'latitude', 'longitude', 'event_date', 'start_time',
-            'cover_image', 'organizer', 'organizer_name', 'status', 'is_featured',
+            'cover_image', 'images', 'organizer', 'organizer_name', 'status', 'is_featured',
             'confirmations_count', 'going_count', 'is_going', 'is_confirmed_by_user',
             'created_at'
         ]

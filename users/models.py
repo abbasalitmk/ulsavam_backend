@@ -37,12 +37,22 @@ class UserManager(BaseUserManager):
         user.save(using=self._db)
         return user
 
+GENDER_CHOICES = [
+    ('male', 'Male'),
+    ('female', 'Female'),
+    ('other', 'Other'),
+    ('prefer_not_to_say', 'Prefer not to say'),
+]
+
 class User(AbstractUser):
     username = None
     phone_number = models.CharField(max_length=20, unique=True, null=True, blank=True)
     email = models.EmailField(unique=True, null=True, blank=True)
     display_name = models.CharField(max_length=150, default="Festival Goer")
     avatar = models.URLField(max_length=500, blank=True, null=True)
+    profile_pic = models.ImageField(upload_to='profile_pics/', blank=True, null=True)
+    date_of_birth = models.DateField(null=True, blank=True)
+    gender = models.CharField(max_length=20, choices=GENDER_CHOICES, null=True, blank=True)
     district = models.ForeignKey(
         'districts.District',
         on_delete=models.SET_NULL,
