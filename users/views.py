@@ -12,7 +12,7 @@ from core.throttling import OTPRequestThrottle, LoginThrottle
 from core.email_service import send_otp_email
 from .models import User, OTPRequest
 from .serializers import (
-    UserSerializer, RegisterSerializer, LoginSerializer,
+    UserSerializer, RegisterSerializer, LoginSerializer, ChangePasswordSerializer,
     OTPRequestSerializer, OTPVerifySerializer, LogoutSerializer
 )
 
@@ -202,6 +202,24 @@ class LogoutView(APIView):
             return Response({'message': 'Successfully logged out.'}, status=status.HTTP_205_RESET_CONTENT)
         except TokenError:
             return Response({'error': 'Invalid or expired refresh token.'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ChangePasswordView(APIView):
+    """
+    Change the authenticated user's password. current_password is
+    required unless the account has no password set yet.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+
+        user = request.user
+        user.set_password(serializer.validated_data['new_password'])
+        user.save()
+
+        return Response({'message': 'Password changed successfully.'}, status=status.HTTP_200_OK)
 
 
 class UserMeView(generics.RetrieveUpdateAPIView):
