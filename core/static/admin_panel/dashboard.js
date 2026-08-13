@@ -97,6 +97,42 @@ async function apiCall(endpoint, method = 'GET', data = null) {
     }
 }
 
+// Multipart API Helper (for file uploads - profile pics / event images)
+async function apiCallMultipart(endpoint, method, formData) {
+    try {
+        const response = await fetch(`${API_BASE}${endpoint}`, {
+            method: method,
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+            },
+            body: formData
+        });
+
+        if (response.status === 401) {
+            localStorage.removeItem('adminToken');
+            window.location.href = '/superadmin/login/';
+            throw new Error('Session expired');
+        }
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            const message = result.error || result.detail ||
+                Object.entries(result).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' | ') ||
+                'An error occurred';
+            showAlert(message, 'error');
+            throw new Error(message);
+        }
+
+        return result;
+    } catch (error) {
+        if (error.message !== 'Session expired') {
+            showAlert(error.message, 'error');
+        }
+        throw error;
+    }
+}
+
 // Alert System
 function showAlert(message, type = 'success') {
     const alertContainer = document.getElementById('alertContainer');
@@ -244,19 +280,172 @@ async function deleteEvent(eventId) {
     }
 }
 
-function openCreateEventModal() {
+// Districts cache (shared by event form dropdown)
+let districtsCache = null;
+
+async function loadDistrictsForSelect() {
+    if (districtsCache) return districtsCache;
+    const response = await fetch('/api/districts/', {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    const data = await response.json();
+    districtsCache = Array.isArray(data) ? data : data.results;
+    return districtsCache;
+}
+
+async function populateDistrictSelect(selectedId) {
+    const districts = await loadDistrictsForSelect();
+    const select = document.getElementById('eventDistrictSelect');
+    select.innerHTML = districts.map(d =>
+        `<option value="${d.id}" ${d.id === selectedId ? 'selected' : ''}>${d.name}</option>`
+    ).join('');
+}
+
+function resetEventForm() {
+    document.getElementById('eventForm').reset();
+    document.getElementById('eventId').value = '';
+    document.getElementById('existingImagesGroup').style.display = 'none';
+    document.getElementById('existingImagesContainer').innerHTML = '';
+}
+
+async function openCreateEventModal() {
+    document.getElementById('eventModalTitle').textContent = 'Create Event';
+    resetEventForm();
+    await populateDistrictSelect(null);
     document.getElementById('eventModal').classList.add('active');
+}
+
+async function editEvent(id) {
+    let evt;
+    try {
+        evt = await apiCall(`/events/${id}/`);
+    } catch (error) {
+        console.error('Error loading event:', error);
+        return;
+    }
+
+    document.getElementById('eventModalTitle').textContent = 'Edit Event';
+    document.getElementById('eventId').value = evt.id;
+    document.getElementById('eventTitle').value = evt.title || '';
+    document.getElementById('eventDescription').value = evt.description || '';
+    document.getElementById('eventCategorySelect').value = evt.category;
+    document.getElementById('eventVenueName').value = evt.venue_name || '';
+    document.getElementById('eventAddress').value = evt.address || '';
+    document.getElementById('eventLatitude').value = evt.latitude ?? '';
+    document.getElementById('eventLongitude').value = evt.longitude ?? '';
+    document.getElementById('eventDate').value = evt.event_date || '';
+    document.getElementById('eventStartTime').value = evt.start_time ? evt.start_time.slice(0, 5) : '';
+    document.getElementById('eventStatusSelect').value = evt.status;
+    document.getElementById('eventIsFeatured').checked = !!evt.is_featured;
+    document.getElementById('eventImages').value = '';
+
+    await populateDistrictSelect(evt.district);
+
+    const container = document.getElementById('existingImagesContainer');
+    container.innerHTML = '';
+    if (evt.images && evt.images.length > 0) {
+        document.getElementById('existingImagesGroup').style.display = 'block';
+        evt.images.forEach(img => {
+            const wrapper = document.createElement('div');
+            wrapper.dataset.imageId = img.id;
+            wrapper.dataset.remove = 'false';
+            wrapper.style.cssText = 'position: relative; width: 80px; height: 80px;';
+            wrapper.innerHTML = `
+                <img src="${img.image_url}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 6px; border: 1px solid var(--border);">
+                <button type="button" onclick="toggleRemoveImage(this)" title="Remove"
+                    style="position: absolute; top: -6px; right: -6px; background: #ef4444; color: white; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; line-height: 1;">×</button>
+            `;
+            container.appendChild(wrapper);
+        });
+    } else {
+        document.getElementById('existingImagesGroup').style.display = 'none';
+    }
+
+    document.getElementById('eventModal').classList.add('active');
+}
+
+function toggleRemoveImage(button) {
+    const wrapper = button.parentElement;
+    const img = wrapper.querySelector('img');
+    const marked = wrapper.dataset.remove === 'true';
+
+    if (marked) {
+        wrapper.dataset.remove = 'false';
+        img.style.opacity = '1';
+        button.textContent = '×';
+        button.style.background = '#ef4444';
+    } else {
+        wrapper.dataset.remove = 'true';
+        img.style.opacity = '0.3';
+        button.textContent = '↺';
+        button.style.background = '#6b7280';
+    }
 }
 
 function closeModal(modalId) {
     document.getElementById(modalId).classList.remove('active');
 }
 
-function saveEvent(event) {
+async function saveEvent(event) {
     event.preventDefault();
-    // Implementation for saving event
-    closeModal('eventModal');
-    loadEvents();
+
+    const eventId = document.getElementById('eventId').value;
+    const submitBtn = document.getElementById('eventSubmitBtn');
+    const originalText = submitBtn.textContent;
+
+    const formData = new FormData();
+    formData.append('title', document.getElementById('eventTitle').value);
+    formData.append('description', document.getElementById('eventDescription').value);
+    formData.append('category', document.getElementById('eventCategorySelect').value);
+    formData.append('district', document.getElementById('eventDistrictSelect').value);
+    formData.append('venue_name', document.getElementById('eventVenueName').value);
+    formData.append('address', document.getElementById('eventAddress').value);
+
+    const latitude = document.getElementById('eventLatitude').value;
+    const longitude = document.getElementById('eventLongitude').value;
+    if (latitude) formData.append('latitude', latitude);
+    if (longitude) formData.append('longitude', longitude);
+
+    formData.append('event_date', document.getElementById('eventDate').value);
+    const startTime = document.getElementById('eventStartTime').value;
+    if (startTime) formData.append('start_time', startTime);
+
+    formData.append('status', document.getElementById('eventStatusSelect').value);
+    formData.append('is_featured', document.getElementById('eventIsFeatured').checked);
+
+    const imageFiles = document.getElementById('eventImages').files;
+    for (let i = 0; i < imageFiles.length; i++) {
+        formData.append('images', imageFiles[i]);
+    }
+
+    if (eventId) {
+        document.querySelectorAll('#existingImagesContainer > div').forEach(wrapper => {
+            if (wrapper.dataset.remove === 'true') {
+                formData.append('remove_image_ids', wrapper.dataset.imageId);
+            }
+        });
+    }
+
+    try {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+
+        if (eventId) {
+            await apiCallMultipart(`/events/${eventId}/`, 'PATCH', formData);
+            showAlert('Event updated successfully!', 'success');
+        } else {
+            await apiCallMultipart('/events/', 'POST', formData);
+            showAlert('Event created successfully!', 'success');
+        }
+
+        closeModal('eventModal');
+        loadEvents();
+    } catch (error) {
+        console.error('Error saving event:', error);
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+    }
 }
 
 // Users Management

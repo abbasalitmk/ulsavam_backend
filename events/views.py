@@ -93,6 +93,11 @@ class EventViewSet(viewsets.ModelViewSet):
         if remove_ids:
             EventImage.objects.filter(event=event, id__in=remove_ids).delete()
 
+        # self.get_object() above pulled `event` from a queryset with
+        # prefetch_related('images'), which cached the pre-mutation image
+        # list on the instance. Re-fetch fresh so the response reflects
+        # the images we just added/removed instead of serving that cache.
+        event = Event.objects.select_related('district', 'organizer').prefetch_related('images').get(pk=event.pk)
         output = EventDetailSerializer(event, context=self.get_serializer_context())
         return Response(output.data)
 

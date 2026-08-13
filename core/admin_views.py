@@ -2,13 +2,14 @@ from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.filters import SearchFilter, OrderingFilter
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from datetime import timedelta
 
 from users.models import User
 from districts.models import District
-from events.models import Event, EventConfirmation, Attendance
+from events.models import Event, EventConfirmation, Attendance, EventImage
 from .admin_serializers import (
     AdminUserSerializer, AdminDistrictSerializer,
     AdminEventListSerializer, AdminEventDetailSerializer
@@ -159,19 +160,67 @@ class AdminDistrictViewSet(viewsets.ModelViewSet):
 
 class AdminEventViewSet(viewsets.ModelViewSet):
     """Admin viewset for event management"""
-    queryset = Event.objects.all().select_related('district', 'organizer')
+    queryset = Event.objects.all().select_related('district', 'organizer').prefetch_related('images')
     permission_classes = [IsAdmin]
     filter_backends = [SearchFilter, OrderingFilter, DjangoFilterBackend]
     search_fields = ['title', 'description', 'venue_name', 'address']
     ordering_fields = ['event_date', 'created_at', 'title']
     ordering = ['-event_date']
     filterset_fields = ['district', 'category', 'status', 'is_featured']
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_serializer_class(self):
-        """Use detail serializer for retrieve, list serializer for list"""
-        if self.action == 'retrieve':
+        """Use detail serializer for retrieve/create/update (list needs the full writable fields); list uses the lighter serializer"""
+        if self.action in ['retrieve', 'create', 'update', 'partial_update']:
             return AdminEventDetailSerializer
         return AdminEventListSerializer
+
+    def perform_create(self, serializer):
+        if serializer.validated_data.get('organizer'):
+            serializer.save()
+        else:
+            serializer.save(organizer=self.request.user)
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        event = serializer.instance
+
+        images = request.FILES.getlist('images')
+        for idx, img in enumerate(images):
+            EventImage.objects.create(event=event, image=img, order=idx)
+
+        output = AdminEventDetailSerializer(event, context=self.get_serializer_context())
+        headers = self.get_success_headers(output.data)
+        return Response(output.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        event = serializer.instance
+
+        images = request.FILES.getlist('images')
+        if images:
+            start_order = event.images.count()
+            for idx, img in enumerate(images):
+                EventImage.objects.create(event=event, image=img, order=start_order + idx)
+
+        remove_ids = request.data.getlist('remove_image_ids') if hasattr(request.data, 'getlist') \
+            else request.data.get('remove_image_ids', [])
+        if remove_ids:
+            EventImage.objects.filter(event=event, id__in=remove_ids).delete()
+
+        # self.get_object() above pulled `event` from a queryset with
+        # prefetch_related('images'), which cached the pre-mutation image
+        # list on the instance. Re-fetch fresh so the response reflects
+        # the images we just added/removed instead of serving that cache.
+        event = Event.objects.select_related('district', 'organizer').prefetch_related('images').get(pk=event.pk)
+        output = AdminEventDetailSerializer(event, context=self.get_serializer_context())
+        return Response(output.data)
 
     @action(detail=True, methods=['post'])
     def verify(self, request, pk=None):

@@ -519,11 +519,19 @@
                 </select>
                 <select id="eventCategory" onchange="filterEvents()">
                     <option value="">All Categories</option>
-                    <option value="temple">Temple</option>
-                    <option value="church">Church</option>
+                    <option value="temple">Temple Festival</option>
+                    <option value="church">Church Feast</option>
+                    <option value="mosque">Mosque Heritage</option>
+                    <option value="dj_music">DJ & Music Show</option>
+                    <option value="beach_meetup">Beach Meetup</option>
                     <option value="arts_culture">Arts & Culture</option>
-                    <option value="sports">Sports</option>
-                    <option value="community">Community</option>
+                    <option value="food_fest">Food Festival</option>
+                    <option value="sports">Sports & Games</option>
+                    <option value="community">Community Gathering</option>
+                    <option value="literature">Literature & Reading</option>
+                    <option value="heritage_walk">Heritage Walk</option>
+                    <option value="market">Local Market</option>
+                    <option value="nature_park">Nature & Park</option>
                 </select>
             </div>
 
@@ -639,29 +647,109 @@
 
     <!-- Modals -->
     <div id="eventModal" class="modal">
-        <div class="modal-content">
-            <h2>Create Event</h2>
+        <div class="modal-content" style="max-width: 700px;">
+            <h2 id="eventModalTitle">Create Event</h2>
             <form id="eventForm" onsubmit="saveEvent(event)">
+                <input type="hidden" id="eventId" value="">
+
                 <div class="form-group">
                     <label>Title</label>
                     <input type="text" id="eventTitle" required>
                 </div>
+
                 <div class="form-group">
                     <label>Description</label>
-                    <textarea id="eventDescription" required></textarea>
+                    <textarea id="eventDescription" rows="3" required></textarea>
                 </div>
-                <div class="form-group">
-                    <label>Category</label>
-                    <select id="eventCategorySelect" required>
-                        <option>temple</option>
-                        <option>church</option>
-                        <option>arts_culture</option>
-                        <option>sports</option>
-                        <option>community</option>
-                    </select>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="eventCategorySelect" required>
+                            <option value="temple">Temple Festival</option>
+                            <option value="church">Church Feast</option>
+                            <option value="mosque">Mosque Heritage</option>
+                            <option value="dj_music">DJ &amp; Music Show</option>
+                            <option value="beach_meetup">Beach Meetup</option>
+                            <option value="arts_culture">Arts &amp; Culture</option>
+                            <option value="food_fest">Food Festival</option>
+                            <option value="sports">Sports &amp; Games</option>
+                            <option value="community">Community Gathering</option>
+                            <option value="literature">Literature &amp; Reading</option>
+                            <option value="heritage_walk">Heritage Walk</option>
+                            <option value="market">Local Market</option>
+                            <option value="nature_park">Nature &amp; Park</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>District</label>
+                        <select id="eventDistrictSelect" required>
+                            <option value="">Loading...</option>
+                        </select>
+                    </div>
                 </div>
+
                 <div class="form-group">
-                    <button type="submit" class="btn btn-primary">Save Event</button>
+                    <label>Venue Name</label>
+                    <input type="text" id="eventVenueName" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Address</label>
+                    <textarea id="eventAddress" rows="2" required></textarea>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label>Latitude</label>
+                        <input type="number" step="any" id="eventLatitude" placeholder="10.0">
+                    </div>
+                    <div class="form-group">
+                        <label>Longitude</label>
+                        <input type="number" step="any" id="eventLongitude" placeholder="76.0">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label>Event Date</label>
+                        <input type="date" id="eventDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Start Time</label>
+                        <input type="time" id="eventStartTime">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="eventStatusSelect">
+                            <option value="pending">Pending Verification</option>
+                            <option value="verified">Verified</option>
+                            <option value="rejected">Rejected</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="display: flex; align-items: flex-end; padding-bottom: 0.75rem;">
+                        <label style="margin: 0; font-weight: 500;">
+                            <input type="checkbox" id="eventIsFeatured" style="width: auto; margin-right: 0.5rem;">
+                            Featured Event
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group" id="existingImagesGroup" style="display: none;">
+                    <label>Existing Images <span style="font-weight: 400; color: #6b7280;">(click × to mark for removal)</span></label>
+                    <div id="existingImagesContainer" style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.5rem;"></div>
+                </div>
+
+                <div class="form-group">
+                    <label>Add Images</label>
+                    <input type="file" id="eventImages" accept="image/*" multiple>
+                </div>
+
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary" id="eventSubmitBtn">Save Event</button>
                     <button type="button" class="btn" style="background: #e5e7eb; margin-left: 0.5rem;" onclick="closeModal('eventModal')">Cancel</button>
                 </div>
             </form>

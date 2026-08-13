@@ -1,7 +1,20 @@
 from rest_framework import serializers
 from users.models import User
 from districts.models import District
-from events.models import Event, EventConfirmation, Attendance
+from events.models import Event, EventConfirmation, Attendance, EventImage
+
+
+class AdminEventImageSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EventImage
+        fields = ['id', 'image_url', 'order', 'created_at']
+
+    def get_image_url(self, obj):
+        request = self.context.get('request')
+        url = obj.image.url
+        return request.build_absolute_uri(url) if request else url
 
 
 class AdminUserSerializer(serializers.ModelSerializer):
@@ -68,7 +81,7 @@ class AdminEventListSerializer(serializers.ModelSerializer):
 
 
 class AdminEventDetailSerializer(serializers.ModelSerializer):
-    """Complete serializer for event detail view"""
+    """Complete serializer for event detail view - also used for create/update"""
     district_name = serializers.CharField(source='district.name', read_only=True)
     organizer_email = serializers.CharField(source='organizer.email', read_only=True)
     organizer_name = serializers.CharField(source='organizer.display_name', read_only=True)
@@ -76,13 +89,15 @@ class AdminEventDetailSerializer(serializers.ModelSerializer):
     attendance_count = serializers.SerializerMethodField()
     confirmations = serializers.SerializerMethodField()
     attendances = serializers.SerializerMethodField()
+    images = AdminEventImageSerializer(many=True, read_only=True)
+    organizer = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), required=False, allow_null=True)
 
     class Meta:
         model = Event
         fields = [
             'id', 'title', 'description', 'category', 'district', 'district_name',
             'venue_name', 'address', 'latitude', 'longitude', 'event_date',
-            'start_time', 'cover_image', 'organizer', 'organizer_email', 'organizer_name',
+            'start_time', 'cover_image', 'images', 'organizer', 'organizer_email', 'organizer_name',
             'status', 'is_featured', 'created_at', 'confirmation_count',
             'attendance_count', 'confirmations', 'attendances'
         ]
