@@ -74,16 +74,25 @@ async function apiCall(endpoint, method = 'GET', data = null) {
 
     try {
         const response = await fetch(`${API_BASE}${endpoint}`, options);
+
+        if (response.status === 401) {
+            localStorage.removeItem('adminToken');
+            window.location.href = '/superadmin/login/';
+            throw new Error('Session expired');
+        }
+
         const result = await response.json();
 
         if (!response.ok) {
-            showAlert(result.error || 'An error occurred', 'error');
-            throw new Error(result.error || 'API Error');
+            showAlert(result.error || result.detail || 'An error occurred', 'error');
+            throw new Error(result.error || result.detail || 'API Error');
         }
 
         return result;
     } catch (error) {
-        showAlert(error.message, 'error');
+        if (error.message !== 'Session expired') {
+            showAlert(error.message, 'error');
+        }
         throw error;
     }
 }

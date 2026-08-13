@@ -18,6 +18,11 @@ $PYTHON -m pip install -r requirements.txt --quiet
 echo "Running database migrations..."
 $PYTHON manage.py migrate || true
 
+# Ensure the SuperAdmin panel account exists (staff+superuser). Idempotent -
+# only sets a password the first time (if the account has none yet).
+echo "Ensuring superadmin account..."
+$PYTHON manage.py ensure_superadmin || true
+
 # Seed data (only if first run - won't duplicate if already exists)
 echo "Seeding data..."
 $PYTHON manage.py seed_data || true
