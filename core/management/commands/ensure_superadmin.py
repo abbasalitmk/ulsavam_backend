@@ -33,7 +33,13 @@ class Command(BaseCommand):
             changed = True
 
         generated_password = None
-        if not user.has_usable_password():
+        # Note: a freshly created user's `password` field defaults to ''
+        # (not None), and Django's has_usable_password() treats '' as
+        # "usable" (only None / the '!'-prefixed marker count as
+        # unusable) - so we must also check for the empty-string case
+        # explicitly, or a brand new account silently ends up with no
+        # working password at all.
+        if not user.password or not user.has_usable_password():
             generated_password = password or secrets.token_urlsafe(12)
             user.set_password(generated_password)
             changed = True
