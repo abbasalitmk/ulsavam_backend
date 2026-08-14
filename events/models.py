@@ -36,8 +36,10 @@ class Event(models.Model):
     address = models.TextField()
     latitude = models.FloatField(default=10.0)
     longitude = models.FloatField(default=76.0)
-    event_date = models.DateField()
+    event_date = models.DateField(help_text="Start date")
     start_time = models.TimeField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True, help_text="Defaults to event_date if not set")
+    end_time = models.TimeField(null=True, blank=True)
     cover_image = models.URLField(max_length=500, blank=True, null=True)
     organizer = models.ForeignKey(
         settings.AUTH_USER_MODEL,

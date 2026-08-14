@@ -335,6 +335,8 @@ async function editEvent(id) {
     document.getElementById('eventLongitude').value = evt.longitude ?? '';
     document.getElementById('eventDate').value = evt.event_date || '';
     document.getElementById('eventStartTime').value = evt.start_time ? evt.start_time.slice(0, 5) : '';
+    document.getElementById('eventEndDate').value = evt.end_date || '';
+    document.getElementById('eventEndTime').value = evt.end_time ? evt.end_time.slice(0, 5) : '';
     document.getElementById('eventStatusSelect').value = evt.status;
     document.getElementById('eventIsFeatured').checked = !!evt.is_featured;
     document.getElementById('eventImages').value = '';
@@ -409,6 +411,11 @@ async function saveEvent(event) {
     formData.append('event_date', document.getElementById('eventDate').value);
     const startTime = document.getElementById('eventStartTime').value;
     if (startTime) formData.append('start_time', startTime);
+
+    const endDate = document.getElementById('eventEndDate').value;
+    if (endDate) formData.append('end_date', endDate);
+    const endTime = document.getElementById('eventEndTime').value;
+    if (endTime) formData.append('end_time', endTime);
 
     formData.append('status', document.getElementById('eventStatusSelect').value);
     formData.append('is_featured', document.getElementById('eventIsFeatured').checked);

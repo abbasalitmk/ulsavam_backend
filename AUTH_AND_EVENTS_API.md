@@ -307,8 +307,10 @@ New events are created with `status: "pending"` and need 3 user confirmations (o
 | `address` | string | yes |
 | `latitude` | float | no (default `10.0`) |
 | `longitude` | float | no (default `76.0`) |
-| `event_date` | date `YYYY-MM-DD` | yes |
+| `event_date` | date `YYYY-MM-DD` | yes — start date |
 | `start_time` | time `HH:MM:SS` | no |
+| `end_date` | date `YYYY-MM-DD` | no — for multi-day events; must be ≥ `event_date` |
+| `end_time` | time `HH:MM:SS` | no — if `end_date` equals `event_date`, must be ≥ `start_time` |
 | `cover_image` | string (URL) | no — legacy external-image field |
 | `images` | file, **repeatable** | no — attach multiple files under the same `images` key |
 
@@ -331,6 +333,22 @@ curl -X POST https://ulsavam-backend.onrender.com/api/events/ \
   -F "images=@/path/photo3.jpg"
 ```
 
+### Example — multi-day event (e.g. a 3-day festival)
+```bash
+curl -X POST https://ulsavam-backend.onrender.com/api/events/ \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -F "title=Kerala Literature Festival" \
+  -F "description=3-day literary festival on the beach." \
+  -F "category=literature" \
+  -F "district=10" \
+  -F "venue_name=Kozhikode Beach" \
+  -F "address=Beach Road, Kozhikode" \
+  -F "event_date=2026-09-20" \
+  -F "start_time=09:30:00" \
+  -F "end_date=2026-09-22" \
+  -F "end_time=20:30:00"
+```
+
 ### Response — `201 Created`
 ```json
 {
@@ -346,6 +364,8 @@ curl -X POST https://ulsavam-backend.onrender.com/api/events/ \
   "longitude": 75.7704,
   "event_date": "2026-09-01",
   "start_time": "07:00:00",
+  "end_date": null,
+  "end_time": null,
   "cover_image": null,
   "images": [
     { "id": 1, "image_url": "https://ulsavam-backend.onrender.com/media/event_images/photo1.jpg", "order": 0, "created_at": "..." },

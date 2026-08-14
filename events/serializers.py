@@ -28,9 +28,9 @@ class EventListSerializer(serializers.ModelSerializer):
         model = Event
         fields = [
             'id', 'title', 'category', 'district', 'district_name', 'district_slug',
-            'venue_name', 'event_date', 'start_time', 'cover_image', 'status',
-            'is_featured', 'confirmations_count', 'going_count', 'is_going',
-            'is_confirmed_by_user', 'created_at'
+            'venue_name', 'event_date', 'start_time', 'end_date', 'end_time',
+            'cover_image', 'status', 'is_featured', 'confirmations_count', 'going_count',
+            'is_going', 'is_confirmed_by_user', 'created_at'
         ]
 
     def get_is_going(self, obj):
@@ -60,11 +60,25 @@ class EventDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'description', 'category', 'district', 'district_details',
             'venue_name', 'address', 'latitude', 'longitude', 'event_date', 'start_time',
-            'cover_image', 'images', 'organizer', 'organizer_name', 'status', 'is_featured',
-            'confirmations_count', 'going_count', 'is_going', 'is_confirmed_by_user',
-            'created_at'
+            'end_date', 'end_time', 'cover_image', 'images', 'organizer', 'organizer_name',
+            'status', 'is_featured', 'confirmations_count', 'going_count', 'is_going',
+            'is_confirmed_by_user', 'created_at'
         ]
         read_only_fields = ['id', 'organizer', 'status', 'created_at']
+
+    def validate(self, attrs):
+        event_date = attrs.get('event_date', getattr(self.instance, 'event_date', None))
+        end_date = attrs.get('end_date', getattr(self.instance, 'end_date', None))
+        if event_date and end_date and end_date < event_date:
+            raise serializers.ValidationError({'end_date': 'End date cannot be before the start date.'})
+
+        if end_date and event_date and end_date == event_date:
+            start_time = attrs.get('start_time', getattr(self.instance, 'start_time', None))
+            end_time = attrs.get('end_time', getattr(self.instance, 'end_time', None))
+            if start_time and end_time and end_time < start_time:
+                raise serializers.ValidationError({'end_time': 'End time cannot be before the start time on the same day.'})
+
+        return attrs
 
     def get_organizer_name(self, obj):
         if not obj.organizer:

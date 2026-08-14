@@ -67,7 +67,7 @@ class AdminEventListSerializer(serializers.ModelSerializer):
         model = Event
         fields = [
             'id', 'title', 'category', 'district', 'district_name',
-            'event_date', 'start_time', 'status', 'is_featured',
+            'event_date', 'start_time', 'end_date', 'end_time', 'status', 'is_featured',
             'organizer_name', 'confirmation_count', 'attendance_count',
             'created_at'
         ]
@@ -97,11 +97,25 @@ class AdminEventDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'description', 'category', 'district', 'district_name',
             'venue_name', 'address', 'latitude', 'longitude', 'event_date',
-            'start_time', 'cover_image', 'images', 'organizer', 'organizer_email', 'organizer_name',
-            'status', 'is_featured', 'created_at', 'confirmation_count',
-            'attendance_count', 'confirmations', 'attendances'
+            'start_time', 'end_date', 'end_time', 'cover_image', 'images', 'organizer',
+            'organizer_email', 'organizer_name', 'status', 'is_featured', 'created_at',
+            'confirmation_count', 'attendance_count', 'confirmations', 'attendances'
         ]
         read_only_fields = ['id', 'created_at']
+
+    def validate(self, attrs):
+        event_date = attrs.get('event_date', getattr(self.instance, 'event_date', None))
+        end_date = attrs.get('end_date', getattr(self.instance, 'end_date', None))
+        if event_date and end_date and end_date < event_date:
+            raise serializers.ValidationError({'end_date': 'End date cannot be before the start date.'})
+
+        if end_date and event_date and end_date == event_date:
+            start_time = attrs.get('start_time', getattr(self.instance, 'start_time', None))
+            end_time = attrs.get('end_time', getattr(self.instance, 'end_time', None))
+            if start_time and end_time and end_time < start_time:
+                raise serializers.ValidationError({'end_time': 'End time cannot be before the start time on the same day.'})
+
+        return attrs
 
     def get_confirmation_count(self, obj):
         return obj.confirmations.count()
